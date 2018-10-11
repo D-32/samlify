@@ -1,4 +1,4 @@
-function verifyTime(utcNotBefore?: string, utcNotOnOrAfter?: string): boolean {
+export function verifyTime(utcNotBefore?: string, utcNotOnOrAfter?: string): boolean {
 
   const now = new Date();
   if (!utcNotBefore && !utcNotOnOrAfter) {
@@ -18,6 +18,6 @@ function verifyTime(utcNotBefore?: string, utcNotOnOrAfter?: string): boolean {
   return +notBeforeLocal <= +now && now < notOnOrAfterLocal;
 }
 
-export {
+export default {
   verifyTime
 };
