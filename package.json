@@ -33,7 +33,7 @@
   "license": "MIT",
   "dependencies": {
     "@passify/xml-encryption": "^0.11.1",
-    "github:d-32/node-xsd-schema-validator": "^0.6.1",
+    "d-32/node-xsd-schema-validator": "^0.6.1",
     "@types/camelcase": "^0.0.30",
     "@types/lodash": "^4.14.112",
     "@types/node": "^7.0.67",
