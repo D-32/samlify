@@ -13,6 +13,7 @@
   "typings": "types/index.d.ts",
   "scripts": {
     "build": "tsc",
+		"install": "npm run build",
     "docs": "docsify serve -o docs",
     "lint": "tslint -p .",
     "lint:fix": "tslint -p . --fix",
