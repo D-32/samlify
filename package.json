@@ -12,7 +12,7 @@
   ],
   "typings": "types/index.d.ts",
   "scripts": {
-    "build": "tsc --noEmitOnError",
+    "build": "tsc --version && tsc",
 		"install": "npm run build",
     "docs": "docsify serve -o docs",
     "lint": "tslint -p .",
@@ -57,6 +57,7 @@
     "ava": "^0.19.1",
     "coveralls": "^3.0.2",
     "nyc": "^11.9.0",
-    "tslint": "5.4.2"
+    "tslint": "5.4.2",
+		"tsc": "2.9.2"
   }
 }
