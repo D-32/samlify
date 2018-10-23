@@ -13,11 +13,10 @@ import {
   ServiceProviderMetadata,
   ServiceProviderSettings,
 } from './types';
-import libsaml from './libsaml';
 import { namespace } from './urn';
 import redirectBinding from './binding-redirect';
 import postBinding from './binding-post';
-import { flow } from './flow';
+import { flow, FlowResult } from './flow';
 
 /*
  * @desc interface function
@@ -28,7 +27,8 @@ export default function(props: ServiceProviderSettings) {
 
 /**
 * @desc Service provider can be configured using either metadata importing or spSetting
-* @param  {object} spSetting
+* @param  {object} spSettingimport { FlowResult } from '../types/src/flow.d';
+
 */
 export class ServiceProvider extends Entity {
   entityMeta: ServiceProviderMetadata;
@@ -68,7 +68,7 @@ export class ServiceProvider extends Entity {
     }
 
     if (protocol === nsBinding.post) {
-      const context = postBinding.base64LoginRequest(libsaml.createXPath('Issuer'), { idp, sp: this }, customTagReplacement);
+      const context = postBinding.base64LoginRequest("/*[local-name(.)='AuthnRequest']", { idp, sp: this }, customTagReplacement);
       return {
         ...context,
         relayState: this.entitySetting.relayState,

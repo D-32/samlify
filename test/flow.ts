@@ -314,7 +314,7 @@ test('send login response with signed assertion + signed message and parse it', 
   const user = { email: 'user@esaml2.com' };
   const { id, context: SAMLResponse } = await idpNoEncrypt.createLoginResponse(spWantMessageSign, sampleRequestInfo, 'post', user, createTemplateCallback(idpNoEncrypt, spWantMessageSign, user));
   // receiver (caution: only use metadata and public key when declare pair-up in oppoent entity)
-  const { samlContent, extract } = await spWantMessageSign.parseLoginResponse(idpNoEncrypt, 'post', { body: { SAMLResponse } });
+  const { samlContent, extract } = await spWantMessageSign.parseLoginResponse (idpNoEncrypt, 'post', { body: { SAMLResponse } });
   t.is(typeof id, 'string');
   t.is(samlContent.startsWith('<samlp:Response'), true);
   t.is(samlContent.endsWith('/samlp:Response>'), true);
@@ -436,8 +436,6 @@ test('idp sends a redirect logout request without signature and sp parses it', a
   t.is(_.includes(query, 'SAMLRequest='), true);
   t.is(typeof id, 'string');
   t.is(typeof context, 'string');
-  // const originURL = new url.URL(context);
-  // const SAMLRequest = originURL.searchParams.get('SAMLRequest');
   const originalURL = url.parse(context, true);
   const SAMLRequest = encodeURIComponent(originalURL.query.SAMLRequest);
   let result;
@@ -512,7 +510,7 @@ test('sp sends a post logout response without signature and parse', async t => {
 });
 
 test('sp sends a post logout response with signature and parse', async t => {
-  const { relayState, type, entityEndpoint, id, context: SAMLResponse } = sp.createLogoutResponse(idpWantLogoutResSign, null, 'post', '', createTemplateCallback(idpWantLogoutResSign, sp, {})) as PostBindingContext;
+  const { relayState, type, entityEndpoint, id, context: SAMLResponse } = sp.createLogoutResponse(idpWantLogoutResSign, sampleRequestInfo, 'post', '', createTemplateCallback(idpWantLogoutResSign, sp, {})) as PostBindingContext;
   const { samlContent, extract } = await idpWantLogoutResSign.parseLogoutResponse(sp, 'post', { body: { SAMLResponse }});
   t.is(typeof extract.signature, 'string');
   t.is(extract.issuer, 'https://sp.example.org/metadata');
@@ -599,8 +597,6 @@ test('should reject signature wrapped response', async t => {
   const wrappedResponse = new Buffer(xmlWrapped).toString('base64');
   try {
     const result = await sp.parseLoginResponse(idpNoEncrypt, 'post', { body: { SAMLResponse: wrappedResponse } });
-    console.log(xmlWrapped);
-    console.log(result);
   } catch (e) {
     t.is(e.message, 'ERR_POTENTIAL_WRAPPING_ATTACK');
   }

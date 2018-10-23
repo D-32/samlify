@@ -9,6 +9,7 @@ import { BindingContext } from './entity';
 import libsaml from './libsaml';
 import utility from './utility';
 import { get } from 'lodash';
+import { LogoutResponseTemplate } from './libsaml';
 
 const binding = wording.binding;
 
@@ -44,7 +45,7 @@ function base64LoginRequest(referenceTagXPath: string, entity: any, customTagRep
       } as any);
     }
     if (metadata.idp.isWantAuthnRequestsSigned()) {
-      const { privateKey, privateKeyPass, requestSignatureAlgorithm: signatureAlgorithm } = spSetting;
+      const { privateKey, privateKeyPass, requestSignatureAlgorithm: signatureAlgorithm, transformationAlgorithms } = spSetting;
       return {
         id,
         context: libsaml.constructSAMLSignature({
@@ -52,8 +53,13 @@ function base64LoginRequest(referenceTagXPath: string, entity: any, customTagRep
           privateKey,
           privateKeyPass,
           signatureAlgorithm,
+          transformationAlgorithms,
           rawSamlMessage: rawSamlRequest,
           signingCert: metadata.sp.getX509Certificate('signing'),
+          signatureConfig: spSetting.signatureConfig || {
+            prefix: 'ds',
+            location: { reference: "/*[local-name(.)='AuthnRequest']/*[local-name(.)='Issuer']", action: 'after' },
+          }
         }),
       };
     }
@@ -129,24 +135,13 @@ async function base64LoginResponse(requestInfo: any = {}, entity: any, user: any
       signingCert: metadata.idp.getX509Certificate('signing'),
       isBase64Output: false,
     };
-    // SAML response must be signed sign message first, then encrypt
-    if (!encryptThenSign && (spSetting.wantMessageSigned || !metadata.sp.isWantAssertionsSigned())) {
-      rawSamlResponse = libsaml.constructSAMLSignature({
-        ...config,
-        rawSamlMessage: rawSamlResponse,
-        isMessageSigned: true,
-        signatureConfig: spSetting.signatureConfig || {
-          prefix: 'ds',
-          location: { reference: '/samlp:Response/saml:Issuer', action: 'after' },
-        },
-      });
-    }
     // step: sign assertion ? -> encrypted ? -> sign message ?
     if (metadata.sp.isWantAssertionsSigned()) {
+      // console.debug('sp wants assertion signed');
       rawSamlResponse = libsaml.constructSAMLSignature({
         ...config,
         rawSamlMessage: rawSamlResponse,
-        referenceTagXPath: '/samlp:Response/saml:Assertion', // libsaml.createXPath('Assertion'),
+        referenceTagXPath: '/samlp:Response/saml:Assertion', 
         signatureConfig: {
           prefix: 'ds',
           location: { reference: '/samlp:Response/saml:Assertion/saml:Issuer', action: 'after' },
@@ -154,7 +149,27 @@ async function base64LoginResponse(requestInfo: any = {}, entity: any, user: any
       });
     }
 
+    // console.debug('after assertion signed', rawSamlResponse);
+
+    // SAML response must be signed sign message first, then encrypt
+    if (!encryptThenSign && (spSetting.wantMessageSigned || !metadata.sp.isWantAssertionsSigned())) {
+      // console.debug('sign then encrypt and sign entire message');
+      rawSamlResponse = libsaml.constructSAMLSignature({
+        ...config,
+        rawSamlMessage: rawSamlResponse,
+        isMessageSigned: true,
+        transformationAlgorithms: spSetting.transformationAlgorithms,
+        signatureConfig: spSetting.signatureConfig || {
+          prefix: 'ds',
+          location: { reference: '/samlp:Response/saml:Issuer', action: 'after' },
+        },
+      });
+    }
+
+    // console.debug('after message signed', rawSamlResponse);
+
     if (idpSetting.isAssertionEncrypted) {
+      // console.debug('idp is configured to do encryption');
       const context = await libsaml.encryptAssertion(entity.idp, entity.sp, rawSamlResponse);
       if (encryptThenSign) {
         //need to decode it
@@ -170,6 +185,7 @@ async function base64LoginResponse(requestInfo: any = {}, entity: any, user: any
         ...config,
         rawSamlMessage: rawSamlResponse,
         isMessageSigned: true,
+        transformationAlgorithms: spSetting.transformationAlgorithms,
         signatureConfig: spSetting.signatureConfig || {
           prefix: 'ds',
           location: { reference: '/samlp:Response/saml:Issuer', action: 'after' },
@@ -228,6 +244,10 @@ function base64LogoutRequest(user, referenceTagXPath, entity, customTagReplaceme
           signatureAlgorithm,
           rawSamlMessage: rawSamlRequest,
           signingCert: metadata.init.getX509Certificate('signing'),
+          signatureConfig: initSetting.signatureConfig || {
+            prefix: 'ds',
+            location: { reference: "/*[local-name(.)='LogoutRequest']/*[local-name(.)='Issuer']", action: 'after' },
+          }
         }),
       };
     }
@@ -267,23 +287,29 @@ function base64LogoutResponse(requestInfo: any, entity: any, customTagReplacemen
         Issuer: metadata.init.getEntityID(),
         IssueInstant: new Date().toISOString(),
         StatusCode: StatusCode.Success,
+        InResponseTo: get(requestInfo, 'extract.request.id', null)
       };
-      if (requestInfo && requestInfo.extract && requestInfo.extract.request) {
-        tvalue.InResponseTo = requestInfo.extract.request.id;
-      }
       rawSamlResponse = libsaml.replaceTagsByValue(libsaml.defaultLogoutResponseTemplate.context, tvalue);
     }
     if (entity.target.entitySetting.wantLogoutResponseSigned) {
-      const { privateKey, privateKeyPass, requestSignatureAlgorithm: signatureAlgorithm } = initSetting;
+      const { privateKey, privateKeyPass, requestSignatureAlgorithm: signatureAlgorithm, transformationAlgorithms } = initSetting;
       return {
         id,
         context: libsaml.constructSAMLSignature({
-          referenceTagXPath: libsaml.createXPath('Issuer'),
+          isMessageSigned: true,
+          transformationAlgorithms: transformationAlgorithms,
           privateKey,
           privateKeyPass,
           signatureAlgorithm,
           rawSamlMessage: rawSamlResponse,
           signingCert: metadata.init.getX509Certificate('signing'),
+          signatureConfig: {
+            prefix: 'ds',
+            location: {
+              reference: "/*[local-name(.)='LogoutResponse']/*[local-name(.)='Issuer']",
+              action: 'after'
+            }
+          } 
         }),
       };
     }

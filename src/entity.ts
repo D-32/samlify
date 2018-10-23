@@ -6,14 +6,13 @@
 import { isNonEmptyArray } from './utility';
 import { namespace, wording, algorithms, messageConfigurations } from './urn';
 import * as uuid from 'uuid';
-import libsaml from './libsaml';
 import IdpMetadata, { IdpMetadata as IdpMetadataConstructor } from './metadata-idp';
 import SpMetadata, { SpMetadata as SpMetadataConstructor } from './metadata-sp';
 import redirectBinding from './binding-redirect';
 import postBinding from './binding-post';
 import { isString, isUndefined } from 'lodash';
 import { MetadataIdpConstructor, MetadataSpConstructor, EntitySetting } from './types';
-import { flow } from './flow';
+import { flow, FlowResult } from './flow';
 
 const dataEncryptionAlgorithm = algorithms.encryption.data;
 const keyEncryptionAlgorithm = algorithms.encryption.key;
@@ -146,7 +145,7 @@ export default class Entity {
     }
     if (binding === wording.binding.post) {
       const entityEndpoint = targetEntity.entityMeta.getSingleLogoutService(binding);
-      const context = postBinding.base64LogoutRequest(user, libsaml.createXPath('Issuer'), { init: this, target: targetEntity }, customTagReplacement);
+      const context = postBinding.base64LogoutRequest(user, "/*[local-name(.)='LogoutRequest']", { init: this, target: targetEntity }, customTagReplacement);
       return {
         ...context,
         relayState,

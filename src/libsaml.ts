@@ -35,6 +35,7 @@ export interface SignatureConstructor {
   isBase64Output?: boolean;
   signatureConfig?: any;
   isMessageSigned?: boolean;
+  transformationAlgorithms?: string[];
 }
 
 export interface SignatureVerifierOptions {
@@ -268,6 +269,7 @@ const libSaml = () => {
     * @param  {string} passphrase           passphrase of the private key [optional]
     * @param  {string|buffer} signingCert   signing certificate
     * @param  {string} signatureAlgorithm   signature algorithm
+    * @param  {string[]} transformationAlgorithms   canonicalization and transformation Algorithms
     * @return {string} base64 encoded string
     */
     constructSAMLSignature(opts: SignatureConstructor) {
@@ -277,6 +279,10 @@ const libSaml = () => {
         privateKey,
         privateKeyPass,
         signatureAlgorithm = signatureAlgorithms.RSA_SHA256,
+        transformationAlgorithms = [
+          'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
+          'http://www.w3.org/2001/10/xml-exc-c14n#',
+        ],
         signingCert,
         signatureConfig,
         isBase64Output = true,
@@ -285,16 +291,17 @@ const libSaml = () => {
       const sig = new SignedXml();
       // Add assertion sections as reference
       if (referenceTagXPath) {
-        sig.addReference(referenceTagXPath, null, getDigestMethod(signatureAlgorithm));
+        sig.addReference(
+          referenceTagXPath,
+          opts.transformationAlgorithms,
+          getDigestMethod(signatureAlgorithm)
+        );
       }
       if (isMessageSigned) {
         sig.addReference(
           // reference to the root node
           '/*',
-          [
-            'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
-            'http://www.w3.org/2001/10/xml-exc-c14n#',
-          ],
+          transformationAlgorithms,
           getDigestMethod(signatureAlgorithm),
           '',
           '',
@@ -305,7 +312,6 @@ const libSaml = () => {
       sig.signatureAlgorithm = signatureAlgorithm;
       sig.keyInfoProvider = new this.getKeyInfo(signingCert, signatureConfig);
       sig.signingKey = utility.readPrivateKey(privateKey, privateKeyPass, true);
-
       if (signatureConfig) {
         sig.computeSignature(rawSamlMessage, signatureConfig);
       } else {
@@ -338,8 +344,8 @@ const libSaml = () => {
       const assertionSignatureNode = select(assertionSignatureXpath, doc);
       const wrappingElementNode = select(wrappingElementsXPath, doc);
 
-      selection = selection.concat(assertionSignatureNode);
       selection = selection.concat(messageSignatureNode);
+      selection = selection.concat(assertionSignatureNode);
 
       // try to catch potential wrapping attack
       if (wrappingElementNode.length !== 0) {
@@ -368,7 +374,8 @@ const libSaml = () => {
             metadataCert = flattenDeep(metadataCert);
           }
           metadataCert = metadataCert.map(utility.normalizeCerString);
-          let x509Certificate = select(".//*[local-name(.)='X509Certificate']", signatureNode)[0].firstChild.data;
+          const certificateNode = select(".//*[local-name(.)='X509Certificate']", signatureNode) as any;
+          let x509Certificate = certificateNode[0].firstChild.data;
           x509Certificate = utility.normalizeCerString(x509Certificate);
           if (includes(metadataCert, x509Certificate)) {
             selectedCert = x509Certificate;
@@ -528,7 +535,7 @@ const libSaml = () => {
         const sourceEntitySetting = sourceEntity.entitySetting;
         const targetEntityMetadata = targetEntity.entityMeta;
         const doc = new dom().parseFromString(xml);
-        const assertions = select("//*[local-name(.)='Assertion']", doc);
+        const assertions = select("//*[local-name(.)='Assertion']", doc) as Node[];
         if (!Array.isArray(assertions)) {
           throw new Error('ERR_NO_ASSERTION');
         }
@@ -578,7 +585,7 @@ const libSaml = () => {
         // Perform encryption depends on the setting of where the message is sent, default is false
         const hereSetting = here.entitySetting;
         const xml = new dom().parseFromString(entireXML);
-        const encryptedAssertions = select("/*[contains(local-name(), 'Response')]/*[local-name(.)='EncryptedAssertion']", xml);
+        const encryptedAssertions = select("/*[contains(local-name(), 'Response')]/*[local-name(.)='EncryptedAssertion']", xml) as Node[];
         if (!Array.isArray(encryptedAssertions)) {
           throw new Error('ERR_UNDEFINED_ENCRYPTED_ASSERTION');
         }
